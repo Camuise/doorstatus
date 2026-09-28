@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@c/ui/card'
 ---
 
 <Layout>
-	<main class="flex min-h-screen items-center justify-center px-6 py-12">
+	<main class="flex flex-1 items-center justify-center px-6 py-12">
 		<Card className="w-full max-w-sm">
 			<CardHeader className="px-8 pt-8 text-center sm:px-10 sm:pt-10">
 				<CardTitle className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
 					Current Status
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="px-8 pb-8 text-center sm:px-10 sm:pb-10">
+			<CardContent className="px-8 pb-8 flex flex-col gap-4 items-center justify-center text-center sm:px-10 sm:pb-10">
 				<div class="flex items-center justify-center gap-3 text-green-400">
 					<span class="text-5xl" role="img" aria-label="Unlocked">🚪</span>
 					<span class="text-6xl font-bold tracking-tight">Inside</span>

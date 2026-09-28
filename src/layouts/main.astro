@@ -11,7 +11,10 @@ import '../styles/global.css'
 		<meta name="generator" content={Astro.generator} />
 		<title>Astro</title>
 	</head>
-	<body>
+	<body class="flex min-h-screen flex-col">
 		<slot />
+		<footer class="shrink-0 py-6 text-center text-sm text-muted-foreground">
+			<p>Made with &lt;3 by Issac</p>
+		</footer>
 	</body>
 </html>
