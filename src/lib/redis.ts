@@ -21,20 +21,24 @@ export function getRedis() {
 	}))
 }
 
-export function parseCurrentStatus(value: string | null) {
+export function parseCurrentStatus(value: unknown) {
 	if (!value) return null
 	try {
-		const parsed = JSON.parse(value) as CurrentStatus
-		return typeof parsed.text === 'string' && typeof parsed.updatedAt === 'number' ? parsed : null
+		const parsed = typeof value === 'string' ? JSON.parse(value) : value
+		if (typeof parsed !== 'object' || parsed === null) return null
+		const status = parsed as Partial<CurrentStatus>
+		return typeof status.text === 'string' && typeof status.updatedAt === 'number' ? status as CurrentStatus : null
 	} catch {
 		return null
 	}
 }
 
-export function parseHistoryEntry(value: string) {
+export function parseHistoryEntry(value: unknown) {
 	try {
-		const parsed = JSON.parse(value) as HistoryEntry
-		return typeof parsed.text === 'string' && typeof parsed.timestamp === 'number' ? parsed : null
+		const parsed = typeof value === 'string' ? JSON.parse(value) : value
+		if (typeof parsed !== 'object' || parsed === null) return null
+		const entry = parsed as Partial<HistoryEntry>
+		return typeof entry.text === 'string' && typeof entry.timestamp === 'number' ? entry as HistoryEntry : null
 	} catch {
 		return null
 	}
