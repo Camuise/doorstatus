@@ -1,6 +1,12 @@
 import type { APIRoute } from 'astro'
 import { env } from '../../env'
-import { getRedis, parseCurrentStatus, parseHistoryEntry } from '../../lib/redis'
+import {
+	getRedis,
+	isAvailability,
+	isHexColor,
+	parseCurrentStatus,
+	parseHistoryEntry,
+} from '../../lib/redis'
 
 const CURRENT_KEY = 'status:current'
 const HISTORY_KEY = 'status:history'
@@ -20,6 +26,8 @@ export const GET: APIRoute = async ({ url }) => {
 		const current = parseCurrentStatus(await redis.get<unknown>(CURRENT_KEY))
 		const response: Record<string, unknown> = {
 			status: current?.text ?? null,
+			availability: current?.availability ?? null,
+			color: current?.color ?? null,
 			updatedAt: current?.updatedAt ?? null,
 		}
 
@@ -47,23 +55,50 @@ export const POST: APIRoute = async ({ request }) => {
 		return json({ error: 'Request body must be valid JSON' }, 400)
 	}
 
-	const text = typeof body === 'object' && body !== null && 'status' in body && typeof body.status === 'string'
-		? body.status.trim()
-		: ''
+	const requestBody = typeof body === 'object' && body !== null ? body as Record<string, unknown> : null
+	const text = typeof requestBody?.status === 'string' ? requestBody.status.trim() : ''
 	if (!text) return json({ error: 'status must be a non-empty string' }, 400)
+
+	const availability = requestBody?.availability
+	if (!isAvailability(availability)) {
+		return json({ error: 'availability must be free, away, busy, dnd, or custom' }, 400)
+	}
+
+	const color = requestBody?.color
+	if (availability === 'custom' && !isHexColor(color)) {
+		return json({ error: 'custom availability requires a hex color' }, 400)
+	}
 
 	const redis = getRedis()
 	if (!redis) return json({ error: 'Redis is not configured' }, 503)
 
 	const now = Date.now()
+	const statusRecord = {
+		text,
+		availability,
+		...(availability === 'custom' ? { color } : {}),
+		updatedAt: now,
+	}
+	const historyRecord = {
+		text,
+		availability,
+		...(availability === 'custom' ? { color } : {}),
+		timestamp: now,
+	}
 	try {
-		await redis.set(CURRENT_KEY, JSON.stringify({ text, updatedAt: now }))
+		await redis.set(CURRENT_KEY, JSON.stringify(statusRecord))
 		await redis.zadd(HISTORY_KEY, {
 			score: now,
-			member: JSON.stringify({ text, timestamp: now }),
+			member: JSON.stringify(historyRecord),
 		})
 		await redis.zremrangebyscore(HISTORY_KEY, 0, now - RETENTION_MS)
-		return json({ ok: true, status: text, updatedAt: now })
+		return json({
+			ok: true,
+			status: text,
+			availability,
+			color: availability === 'custom' ? color : null,
+			updatedAt: now,
+		})
 	} catch {
 		return json({ error: 'Unable to update status' }, 503)
 	}
