@@ -47,18 +47,50 @@ const formatRelativeTime = (timestamp: number | null) => {
   return `Updated ${days} day${days === 1 ? "" : "s"} ago`;
 };
 
-const currentText = status?.text ?? "No status yet";
+const currentText =
+  status?.availability === "asleep"
+    ? "Sleeping"
+    : (status?.text ?? "No status yet");
 const updatedLabel = formatRelativeTime(status?.updatedAt ?? null);
 
 const statusLabels: Record<Availability, string> = {
   free: "Available",
   away: "Away",
   busy: "Busy",
-  dnd: "DND",
+  dnd: "Do Not Disturb",
+  asleep: "Asleep",
   custom: "Other",
 };
 
-const getStatusStyle = (status: { availability: Availability; color?: string }) => {
+const getColorForeground = (color: string) => {
+  const hex = color.slice(1);
+  const expanded =
+    hex.length <= 4
+      ? hex
+          .slice(0, 3)
+          .split("")
+          .map((value) => value + value)
+          .join("")
+      : hex.slice(0, 6);
+  const red = Number.parseInt(expanded.slice(0, 2), 16);
+  const green = Number.parseInt(expanded.slice(2, 4), 16);
+  const blue = Number.parseInt(expanded.slice(4, 6), 16);
+  const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
+  return brightness > 155 ? "text-slate-950" : "text-white";
+};
+
+const getStatusStyle = (status: {
+  availability: Availability;
+  color?: string;
+}) => {
+  if (status.color) {
+    return {
+      background: "bg-transparent",
+      backgroundColor: status.color,
+      foreground: getColorForeground(status.color),
+    };
+  }
+
   if (status.availability === "custom") {
     return {
       background: "bg-slate-400",
@@ -67,18 +99,27 @@ const getStatusStyle = (status: { availability: Availability; color?: string }) 
     };
   }
 
-  const styles: Record<Exclude<Availability, "custom">, { background: string; foreground: string }> = {
+  const styles: Record<
+    Exclude<Availability, "custom">,
+    { background: string; foreground: string }
+  > = {
     free: { background: "bg-emerald-400", foreground: "text-slate-950" },
     away: { background: "bg-yellow-400", foreground: "text-slate-950" },
     busy: { background: "bg-red-500", foreground: "text-white" },
     dnd: { background: "bg-purple-500", foreground: "text-white" },
+    asleep: { background: "bg-blue-500", foreground: "text-white" },
   };
   return { ...styles[status.availability], backgroundColor: undefined };
 };
 
-const getStatusLabel = (availability: Availability) => statusLabels[availability];
+const getStatusLabel = (availability: Availability) =>
+  statusLabels[availability];
 const currentStatusStyle = unavailable
-  ? { background: "bg-destructive", foreground: "text-destructive-foreground", backgroundColor: undefined }
+  ? {
+      background: "bg-destructive",
+      foreground: "text-destructive-foreground",
+      backgroundColor: undefined,
+    }
   : status
     ? getStatusStyle(status)
     : getStatusStyle({ availability: "custom" });
@@ -107,7 +148,9 @@ const currentStatusLabel = unavailable
 
     <section
       class={`border border-foreground/10 px-6 py-8 shadow-2xl shadow-black/5 sm:px-10 sm:py-12 ${currentStatusStyle.background} ${currentStatusStyle.foreground}`}
-      style={currentStatusStyle.backgroundColor ? `background-color: ${currentStatusStyle.backgroundColor}` : undefined}
+      style={currentStatusStyle.backgroundColor
+        ? `background-color: ${currentStatusStyle.backgroundColor}`
+        : undefined}
       aria-labelledby="current-status"
     >
       <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -153,10 +196,16 @@ const currentStatusLabel = unavailable
               <article class="relative border-b border-foreground/10 py-4 first:pt-0 last:border-0">
                 <span
                   class={`absolute -left-6.25 top-5 h-2.5 w-2.5 rounded-full ring-4 ring-background ${getStatusStyle(entry).background}`}
-                  style={getStatusStyle(entry).backgroundColor ? `background-color: ${getStatusStyle(entry).backgroundColor}` : undefined}
+                  style={
+                    getStatusStyle(entry).backgroundColor
+                      ? `background-color: ${getStatusStyle(entry).backgroundColor}`
+                      : undefined
+                  }
                   aria-hidden="true"
                 />
-                <p class="font-medium">{entry.text}</p>
+                <p class="font-medium">
+                  {entry.availability === "asleep" ? "Sleeping" : entry.text}
+                </p>
                 <time
                   class="mt-1 block text-xs text-muted-foreground"
                   datetime={new Date(entry.timestamp).toISOString()}
