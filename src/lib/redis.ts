@@ -15,15 +15,20 @@ export type HistoryEntry = {
 	color?: string
 }
 
-export const availabilityValues = ['free', 'away', 'busy', 'dnd', 'custom'] as const
+export const availabilityValues = ['free', 'away', 'busy', 'dnd', 'asleep', 'custom'] as const
 export type Availability = (typeof availabilityValues)[number]
 
 export function isAvailability(value: unknown): value is Availability {
 	return typeof value === 'string' && availabilityValues.includes(value as Availability)
 }
 
+export function normalizeAvailability(value: unknown): Availability {
+	if (value === 'sleeping') return 'asleep'
+	return isAvailability(value) ? value : 'custom'
+}
+
 export function isHexColor(value: unknown): value is string {
-	return typeof value === 'string' && /^#[0-9a-f]{3,8}$/i.test(value)
+	return typeof value === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)
 }
 
 let client: Redis | undefined
@@ -45,7 +50,7 @@ export function parseCurrentStatus(value: unknown) {
 		if (typeof status.text !== 'string' || typeof status.updatedAt !== 'number') return null
 		return {
 			text: status.text,
-			availability: isAvailability(status.availability) ? status.availability : 'custom',
+			availability: normalizeAvailability(status.availability),
 			updatedAt: status.updatedAt,
 			...(isHexColor(status.color) ? { color: status.color } : {}),
 		}
@@ -62,7 +67,7 @@ export function parseHistoryEntry(value: unknown) {
 		if (typeof entry.text !== 'string' || typeof entry.timestamp !== 'number') return null
 		return {
 			text: entry.text,
-			availability: isAvailability(entry.availability) ? entry.availability : 'custom',
+			availability: normalizeAvailability(entry.availability),
 			timestamp: entry.timestamp,
 			...(isHexColor(entry.color) ? { color: entry.color } : {}),
 		}

@@ -56,18 +56,23 @@ export const POST: APIRoute = async ({ request }) => {
 	}
 
 	const requestBody = typeof body === 'object' && body !== null ? body as Record<string, unknown> : null
-	const text = typeof requestBody?.status === 'string' ? requestBody.status.trim() : ''
-	if (!text) return json({ error: 'status must be a non-empty string' }, 400)
+	const requestedText = typeof requestBody?.status === 'string' ? requestBody.status.trim() : ''
+	if (!requestedText) return json({ error: 'status must be a non-empty string' }, 400)
 
 	const availability = requestBody?.availability
 	if (!isAvailability(availability)) {
-		return json({ error: 'availability must be free, away, busy, dnd, or custom' }, 400)
+		return json({ error: 'availability must be free, away, busy, dnd, asleep, or custom' }, 400)
 	}
+	const text = availability === 'asleep' ? 'Sleeping' : requestedText
 
 	const color = requestBody?.color
+	if (color !== undefined && !isHexColor(color)) {
+		return json({ error: 'color must be a valid hex color' }, 400)
+	}
 	if (availability === 'custom' && !isHexColor(color)) {
 		return json({ error: 'custom availability requires a hex color' }, 400)
 	}
+	const validatedColor = isHexColor(color) ? color : undefined
 
 	const redis = getRedis()
 	if (!redis) return json({ error: 'Redis is not configured' }, 503)
@@ -76,13 +81,13 @@ export const POST: APIRoute = async ({ request }) => {
 	const statusRecord = {
 		text,
 		availability,
-		...(availability === 'custom' ? { color } : {}),
+		...(validatedColor ? { color: validatedColor } : {}),
 		updatedAt: now,
 	}
 	const historyRecord = {
 		text,
 		availability,
-		...(availability === 'custom' ? { color } : {}),
+		...(validatedColor ? { color: validatedColor } : {}),
 		timestamp: now,
 	}
 	try {
@@ -96,7 +101,7 @@ export const POST: APIRoute = async ({ request }) => {
 			ok: true,
 			status: text,
 			availability,
-			color: availability === 'custom' ? color : null,
+			color: validatedColor ?? null,
 			updatedAt: now,
 		})
 	} catch {
