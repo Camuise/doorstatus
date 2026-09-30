@@ -1,25 +1,75 @@
 ---
+import { getRedis, parseCurrentStatus, parseHistoryEntry, type HistoryEntry } from '../lib/redis'
 import Layout from '../layouts/main.astro'
-import { Card, CardContent, CardHeader, CardTitle } from '@c/ui/card'
+
+export const prerender = false
+
+let status: ReturnType<typeof parseCurrentStatus> = null
+let history: HistoryEntry[] = []
+let unavailable = false
+
+try {
+	const redis = getRedis()
+	if (redis) {
+		status = parseCurrentStatus(await redis.get<string>('status:current'))
+		const entries = await redis.zrange<string[]>('status:history', 0, -1, { rev: true })
+		history = entries.map((entry: string) => parseHistoryEntry(entry)).filter((entry: HistoryEntry | null): entry is HistoryEntry => entry !== null)
+	} else {
+		unavailable = true
+	}
+} catch {
+	unavailable = true
+}
+
+const formatRelativeTime = (timestamp: number | null) => {
+	if (!timestamp) return 'Waiting for the first update'
+	const elapsed = Math.max(0, Date.now() - timestamp)
+	const minutes = Math.floor(elapsed / 60_000)
+	if (minutes < 1) return 'Updated just now'
+	if (minutes < 60) return `Updated ${minutes} minute${minutes === 1 ? '' : 's'} ago`
+	const hours = Math.floor(minutes / 60)
+	if (hours < 24) return `Updated ${hours} hour${hours === 1 ? '' : 's'} ago`
+	const days = Math.floor(hours / 24)
+	return `Updated ${days} day${days === 1 ? '' : 's'} ago`
+}
+
+const currentText = status?.text ?? 'No status yet'
+const updatedLabel = formatRelativeTime(status?.updatedAt ?? null)
 ---
 
 <Layout>
-	<main class="flex flex-1 items-center justify-center px-6 py-12">
-		<Card className="w-full max-w-sm">
-			<CardHeader className="px-8 pt-8 text-center sm:px-10 sm:pt-10">
-				<CardTitle className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
-					Current Status
-				</CardTitle>
-			</CardHeader>
-			<CardContent className="px-8 pb-8 flex flex-col gap-4 items-center justify-center text-center sm:px-10 sm:pb-10">
-				<div class="flex items-center justify-center gap-3 text-green-400">
-					<span class="text-5xl" role="img" aria-label="Unlocked">🚪</span>
-					<span class="text-6xl font-bold tracking-tight">Inside</span>
+	<main class="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8 px-6 py-12 sm:px-10">
+		<header class="flex items-center justify-between border-b border-foreground/10 pb-5">
+			<div>
+				<p class="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Dorm door</p>
+				<h1 class="mt-2 text-2xl font-semibold tracking-tight">Where I am</h1>
+			</div>
+			<span class={`h-3 w-3 rounded-full ${unavailable ? 'bg-destructive' : 'bg-emerald-400'}`} aria-label={unavailable ? 'Status unavailable' : 'Status connected'}></span>
+		</header>
+
+		<section class="border border-foreground/10 bg-card px-6 py-8 shadow-2xl shadow-black/5 sm:px-10 sm:py-12" aria-labelledby="current-status">
+			<p id="current-status" class="text-sm text-muted-foreground">Current status</p>
+			<p class="mt-4 text-5xl font-semibold tracking-tight sm:text-7xl">{currentText}</p>
+			<p class="mt-5 text-sm text-muted-foreground">{unavailable ? 'Connect Redis to start receiving updates' : updatedLabel}</p>
+		</section>
+
+		<section aria-labelledby="timeline-heading">
+			<div class="mb-4 flex items-end justify-between gap-4">
+				<div>
+					<p class="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Last seven days</p>
+					<h2 id="timeline-heading" class="mt-2 text-lg font-semibold">Status changes</h2>
 				</div>
-				<p class="text-sm text-muted-foreground">
-					Last updated: Today, 10:00 AM
-				</p>
-			</CardContent>
-		</Card>
+				<p class="text-xs text-muted-foreground">{history.length} update{history.length === 1 ? '' : 's'}</p>
+			</div>
+			<div class="border-l border-foreground/15 pl-5">
+				{history.length ? history.map((entry) => (
+					<article class="relative border-b border-foreground/10 py-4 first:pt-0 last:border-0">
+						<span class="absolute -left-6.25 top-5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background first:top-1" aria-hidden="true"></span>
+						<p class="font-medium">{entry.text}</p>
+						<time class="mt-1 block text-xs text-muted-foreground" datetime={new Date(entry.timestamp).toISOString()}>{new Date(entry.timestamp).toLocaleString()}</time>
+					</article>
+				)) : <p class="text-sm text-muted-foreground">No changes recorded yet.</p>}
+			</div>
+		</section>
 	</main>
 </Layout>
