@@ -17,14 +17,14 @@ export const GET: APIRoute = async ({ url }) => {
 	if (!redis) return json({ error: 'Redis is not configured' }, 503)
 
 	try {
-		const current = parseCurrentStatus(await redis.get<string>(CURRENT_KEY))
+		const current = parseCurrentStatus(await redis.get<unknown>(CURRENT_KEY))
 		const response: Record<string, unknown> = {
 			status: current?.text ?? null,
 			updatedAt: current?.updatedAt ?? null,
 		}
 
 		if (url.searchParams.get('history') === 'true') {
-			const entries = await redis.zrange<string[]>(HISTORY_KEY, 0, -1, { rev: true })
+			const entries = await redis.zrange<unknown[]>(HISTORY_KEY, 0, -1, { rev: true })
 			response.history = entries.map(parseHistoryEntry).filter((entry) => entry !== null)
 		}
 

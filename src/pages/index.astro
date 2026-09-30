@@ -11,9 +11,9 @@ let unavailable = false
 try {
 	const redis = getRedis()
 	if (redis) {
-		status = parseCurrentStatus(await redis.get<string>('status:current'))
-		const entries = await redis.zrange<string[]>('status:history', 0, -1, { rev: true })
-		history = entries.map((entry: string) => parseHistoryEntry(entry)).filter((entry: HistoryEntry | null): entry is HistoryEntry => entry !== null)
+		status = parseCurrentStatus(await redis.get<unknown>('status:current'))
+		const entries = await redis.zrange<unknown[]>('status:history', 0, -1, { rev: true })
+		history = entries.map((entry: unknown) => parseHistoryEntry(entry)).filter((entry: HistoryEntry | null): entry is HistoryEntry => entry !== null)
 	} else {
 		unavailable = true
 	}
