@@ -47,6 +47,17 @@ const formatRelativeTime = (timestamp: number | null) => {
   return `Updated ${days} day${days === 1 ? "" : "s"} ago`;
 };
 
+const formatEasternTime = (timestamp: number) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(timestamp));
+
 const currentText =
   status?.availability === "asleep"
     ? "Sleeping"
@@ -210,7 +221,7 @@ const currentStatusLabel = unavailable
                   class="mt-1 block text-xs text-muted-foreground"
                   datetime={new Date(entry.timestamp).toISOString()}
                 >
-                  {new Date(entry.timestamp).toLocaleString()}
+                  {formatEasternTime(entry.timestamp)}
                 </time>
               </article>
             ))
