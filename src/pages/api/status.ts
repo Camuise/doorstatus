@@ -77,20 +77,38 @@ export const POST: APIRoute = async ({ request }) => {
 	const redis = getRedis()
 	if (!redis) return json({ error: 'Redis is not configured' }, 503)
 
-	const now = Date.now()
-	const statusRecord = {
-		text,
-		availability,
-		...(validatedColor ? { color: validatedColor } : {}),
-		updatedAt: now,
-	}
-	const historyRecord = {
-		text,
-		availability,
-		...(validatedColor ? { color: validatedColor } : {}),
-		timestamp: now,
-	}
 	try {
+		const current = parseCurrentStatus(await redis.get<unknown>(CURRENT_KEY))
+		const currentColor = current?.color ?? null
+		const incomingColor = validatedColor ?? null
+		if (
+			current?.text === text &&
+			current.availability === availability &&
+			currentColor === incomingColor
+		) {
+			return json({
+				ok: true,
+				updated: false,
+				status: text,
+				availability,
+				color: incomingColor,
+				updatedAt: current.updatedAt,
+			})
+		}
+
+		const now = Date.now()
+		const statusRecord = {
+			text,
+			availability,
+			...(validatedColor ? { color: validatedColor } : {}),
+			updatedAt: now,
+		}
+		const historyRecord = {
+			text,
+			availability,
+			...(validatedColor ? { color: validatedColor } : {}),
+			timestamp: now,
+		}
 		await redis.set(CURRENT_KEY, JSON.stringify(statusRecord))
 		await redis.zadd(HISTORY_KEY, {
 			score: now,
@@ -99,6 +117,7 @@ export const POST: APIRoute = async ({ request }) => {
 		await redis.zremrangebyscore(HISTORY_KEY, 0, now - RETENTION_MS)
 		return json({
 			ok: true,
+			updated: true,
 			status: text,
 			availability,
 			color: validatedColor ?? null,
