@@ -86,14 +86,7 @@ export const POST: APIRoute = async ({ request }) => {
 			current.availability === availability &&
 			currentColor === incomingColor
 		) {
-			return json({
-				ok: true,
-				updated: false,
-				status: text,
-				availability,
-				color: incomingColor,
-				updatedAt: current.updatedAt,
-			})
+			return new Response(null, { status: 204 })
 		}
 
 		const now = Date.now()
